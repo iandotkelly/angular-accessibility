@@ -7,8 +7,39 @@
 'use strict';
 
 (function() {
-	
+
 	var angularAccessibility = angular.module('angular-accessibility', []);
+
+	/**
+	 * Constants
+	 */
+	angularAccessibility.constant('MODULE_VERSION', '0.0.0');
+
+	/**
+	 * Simple implementation of closest
+	 *
+	 * @param  {String} name	The name of the tag to find
+	 * @return {Object|Boolean} The parent element with that name, or false
+	 */
+	angular.element.prototype.closest = function (name) {
+
+		var cur, tagName;
+
+		name = name.toUpperCase();
+
+		for (cur = this; cur; cur = cur.parent()) {
+			tagName = cur.prop('tagName');
+			if (tagName === 'BODY') {
+				break;
+			}
+			if (tagName === name) {
+				return cur;
+			}
+		}
+
+		return false;
+	};
+
 
 	/**
 	* Directive for accessible forms
@@ -64,29 +95,28 @@
 		return {
 			restrict: 'E',
 			requires: '^accessibleForm',
-			template: ['<fieldset class="form-group">',
-				'<div class="sr-only"></div>',
-				'<label class="col-sm-3 control-label"></label>',
-				'<div class="col-sm-7">',
-				'<input type="checkbox" class="form-control"></input>',
-				'</div>',
-				'</fieldset>'].join(''),
+			template: ['<fieldset class="aa-fieldset">',
+							'<div class="sr-only"></div>',
+							'<label class="aa-label"></label>',
+							'<div class="aa-inputwrap">',
+								'<input type="checkbox" class="aa-input"></input>',
+							'</div>',
+						'</fieldset>'].join(''),
 			link: function (scope, aCheckbox, attributes) {
-				/* jshint maxstatements: 50 */
+				/* jshint maxstatements: 20 */
 
-				var eLabel, eHelp, eInput, eFieldset, children, id;
-
-				// the fieldset - should be the only child
-				eFieldset = aCheckbox.children().eq(0);
-				// the help and label
-				children = eFieldset.children();
-				eHelp = children.eq(0);
-				eLabel = children.eq(1);
-				// the input
-				eInput = children.eq(2).children().eq(0);
+				var eFieldset = aCheckbox.children().eq(0);
+				var children = eFieldset.children();
+				var eHelp = children.eq(0);
+				var eLabel = children.eq(1);
+				var eInputWrap = children.eq(2);
+				var eInput = eInputWrap.children().eq(0);
 
 				// get the id of the input
-				id = attributes.id + '-checkbox';
+				var id = attributes.id + '-checkbox';
+
+				// set the fieldset up
+				eFieldset.addClass(attributes.classFieldset);
 
 				// set the help div up
 				eHelp.attr('id', id + '-help');
@@ -95,11 +125,14 @@
 				// set the label up
 				eLabel.attr('for', id);
 				eLabel.text(attributes.label);
+				eLabel.addClass(attributes.classLabel);
 
-				// se the input up
+				// set the input up
 				eInput.attr('id', id);
 				eInput.attr('aria-describedby', id + '-help');
 				eInput.attr('ng-model', attributes['ng-model']);
+				eInput.addClass(attributes.class);
+				eInputWrap.addClass(attributes.classInputwrap);
 
 				// replace the input with the new fieldset
 				aCheckbox.replaceWith(eFieldset);
@@ -122,52 +155,61 @@
 			// it must be contained in an accessible form
 			requires: '^accessibleForm',
 			// the template
-			template: ['<fieldset class="form-group">',
-				'<legend class="col-sm-3 control-label horizontal"></legend>',
-				'<div class="col-sm-7">',
-				'<div class="checkbox">',
-				'<label>',
-				'<input type="checkbox"></input>',
-				'</label>',
-				'</div></div>',
-				'</fieldset>'].join(''),
+			template: ['<fieldset class="aa-fieldset">',
+							'<legend class="aa-legend"></legend>',
+							'<div class="aa-checkbox-group">',
+								'<div class="aa-checkbox">',
+									'<input type="checkbox" class="aa-checkbox-input"></input>',
+									'<label class="aa-checkbox-label"></label>',
+								'</div>',
+							'</div>',
+						'</fieldset>'].join(''),
 			// converts the template to the final state
 			link: function (scope, aInput, attributes) {
-				/* jshint maxstatements: 50 */
+				/* jshint maxstatements: 20 */
 
-				var eLegend, eLabel, eRepeat, eInput, eFieldset, name;
-
-				// @todo - consider reverting this to jqLite
-				eFieldset = aInput.children('fieldset');
-				eLegend = eFieldset.children('legend');
-				eRepeat = eFieldset.find('div.checkbox');
-				eLabel =  eRepeat.children('label');
-				eInput = eLabel.children('input');
+				var eFieldset = aInput.children().eq(0);
+				var children = eFieldset.children();
+				var eLegend = children.eq(0);
+				var eCheckboxGroup = children.eq(1);
+				var eCheckbox = eCheckboxGroup.children().eq(0);
+				children = eCheckbox.children();
+				var eInput = children.eq(0);
+				var eLabel =  children.eq(1);
 
 				// iterate over all the attributes of the a-checkboxgroup
 				// and assign them to the appropriate part of the template
-				for (name in attributes.$attr) {
+				for (var name in attributes.$attr) {
 					if (attributes.$attr.hasOwnProperty(name)) {
 						switch (name) {
+						case 'id':
+							eInput.attr('id', attributes.id);
+							eLabel.attr('for', attributes.id); break;
 						case 'legend':
-							eLegend.text(attributes.legend);
-							break;
+							eLegend.text(attributes.legend); break;
 						case 'label':
-							eLabel.prepend('{{' + attributes.label + '}}');
-							break;
+							eLabel.text('{{' + attributes.label + '}}'); break;
 						case 'repeat':
-							eRepeat.attr('ng-repeat', attributes.repeat);
-							break;
+							eCheckbox.attr('ng-repeat', attributes.repeat); break;
 						case 'modelArray':
-							eInput.attr('checklist-model', attributes.modelArray);
-							break;
+							eInput.attr('checklist-model', attributes.modelArray); break;
 						case 'modelValue':
-							eInput.attr('checklist-value', attributes.modelValue);
-							break;
+							eInput.attr('checklist-value', attributes.modelValue); break;
+						case 'classFieldset':
+							eFieldset.addClass(attributes.classFieldset); break;
+						case 'classLegend':
+							eLegend.addClass(attributes.classLegend); break;
+						case 'classCheckboxGroup':
+							eCheckboxGroup.addClass(attributes.classCheckboxGroup); break;
+						case 'classCheckbox':
+							eCheckbox.addClass(attributes.classCheckbox); break;
+						case 'classLabel':
+							eLabel.addClass(attributes.classLabel); break;
+						case 'class':
+							eInput.addClass(attributes.class); break;
 						default:
 							// by default move the attribute to the input
-							eInput.attr(attributes.$attr[name], attributes[name]);
-							break;
+							eInput.attr(attributes.$attr[name], attributes[name]); break;
 						}
 					}
 				}
@@ -193,71 +235,66 @@
 			// it must be contained in an accessible form
 			requires: '^accessibleForm',
 			// the template
-			template: ['<fieldset class="form-group">',
-				'<div class="sr-only"></div>',
-				'<div class="col-sm-7 col-sm-offset-3"></div>',
-				'<label class="col-sm-3 control-label"></label>',
-				'<div class="col-sm-7">',
-				'<input blur-focus class="form-control"></input>',
-				'</div>',
-				'</fieldset>'].join(''),
+			template: ['<fieldset class="aa-fieldset">',
+							'<div class="sr-only"></div>',
+							'<div class="aa-error"></div>',
+							'<label class="aa-label"></label>',
+							'<div class="aa-inputwrap">',
+								'<input class="aa-input" blur-focus></input>',
+							'</div>',
+						'</fieldset>'].join(''),
 			// converts the template to the final state
 			link: function (scope, aInput, attributes) {
-				/* jshint maxstatements: 50 */
+				/* jshint maxstatements: 21 */
 
-				var eLabel, eHelp, eError, eInput, inputName,
-					eFieldset, name, children, attributeName, formName, id;
-
-				// the fieldset - should be the only child
-				eFieldset = aInput.children().eq(0);
-				// the help, error and label
-				children = eFieldset.children();
-				eHelp = children.eq(0);
-				eError = children.eq(1);
-				eLabel = children.eq(2);
-				eInput = children.eq(3).children().eq(0);
+				var eFieldset = aInput.children().eq(0);
+				var children = eFieldset.children();
+				var eHelp = children.eq(0);
+				var eError = children.eq(1);
+				var eLabel = children.eq(2);
+				var eInputWrapper = children.eq(3);
+				var eInput = eInputWrapper.children().eq(0);
 
 				// iterate over all the attributes of the a-input
 				// and assign them to the appropriate part of the template
-				for (name in attributes.$attr) {
+				for (var name in attributes.$attr) {
 					if (attributes.$attr.hasOwnProperty(name)) {
-						attributeName = attributes.$attr[name];
 						switch (name) {
 						case 'id':
-							id = attributes.id + '-input';
+							var id = attributes.id + '-input';
 							eHelp.attr('id', id + '-help');
 							eError.attr('id', id + '-error');
 							eInput.attr('id', id);
-							eLabel.attr('for', id);
-							break;
+							eLabel.attr('for', id); break;
 						case 'help':
-							// set the help text
-							eHelp.text(attributes[name]);
-							break;
+							eHelp.text(attributes.help); break;
 						case 'error':
-							// set the help text
-							eError.text(attributes[name]);
-							break;
+							eError.text(attributes.error); break;
 						case 'label':
-							// set the help text
-							eLabel.text(attributes[name]);
-							break;
+							eLabel.text(attributes.label);break;
 						case 'required':
 							eInput.attr('required', 'true');
-							eInput.attr('aria-required', 'true');
-							break;
+							eInput.attr('aria-required', 'true'); break;
+						case 'classInputwrap':
+							eInputWrapper.addClass(attributes.classInputwrap); break;
+						case 'classLabel':
+							eLabel.addClass(attributes.classLabel); break;
+						case 'classError':
+							eError.addClass(attributes.classError); break;
+						case 'classFieldset':
+							eFieldset.addClass(attributes.classFieldset); break;
+						case 'class':
+							eInput.addClass(attributes.class); break;
 						default:
 							// by default move the attribute to the input
-							eInput.attr(attributeName, attributes[name]);
-							break;
+							eInput.attr(attributes.$attr[name], attributes[name]);
 						}
-						//aInput.removeAttr(attributeName);
 					}
 				}
 
 				// find the accessible form name
-				formName = aInput.closest('form').attr('name');
-				inputName = formName + '.' + eInput.attr('name');
+				var formName = aInput.closest('form').attr('name');
+				var inputName = formName + '.' + eInput.attr('name');
 				// set up the validation failures
 				eFieldset.attr('ng-class',
 					'{\'has-error\': ' + inputName + '.failsValidation()}');
@@ -287,70 +324,67 @@
 			// it must be contained in an accessible form
 			requires: '^accessibleForm',
 			// the template
-			template: ['<fieldset class="form-group">',
-				'<div class="sr-only"></div>',
-				'<div class="col-sm-7 col-sm-offset-3"></div>',
-				'<label class="col-sm-3 control-label"></label>',
-				'<div class="col-sm-7">',
-				'<select blur-focus class="form-control"></input>',
-				'</div>',
-				'</fieldset>'].join(''),
-			// converts the template to the final state
+			template: ['<fieldset class="aa-fieldset">',
+							'<div class="sr-only"></div>',
+							'<div class="aa-error"></div>',
+							'<label class="aa-label"></label>',
+							'<div class="aa-inputwrap">',
+								'<select blur-focus class="aa-select"></input>',
+							'</div>',
+						'</fieldset>'].join(''),
 			link: function (scope, aSelect, attributes) {
-				/* jshint maxstatements: 50 */
-
-				var eLabel, eHelp, eError, eSelect, inputName,
-					eFieldset, name, children, attributeName, formName, id;
+				/* jshint maxstatements: 20 */
 
 				// the fieldset - should be the only child
-				eFieldset = aSelect.children().eq(0);
+				var eFieldset = aSelect.children().eq(0);
 				// the help, error and label
-				children = eFieldset.children();
-				eHelp = children.eq(0);
-				eError = children.eq(1);
-				eLabel = children.eq(2);
-				eSelect = children.eq(3).children().eq(0);
+				var children = eFieldset.children();
+				var eHelp = children.eq(0);
+				var eError = children.eq(1);
+				var eLabel = children.eq(2);
+				var eSelectwrap = children.eq(3);
+				var eSelect = eSelectwrap.children().eq(0);
 
 				// iterate over all the attributes of the a-input
 				// and assign them to the appropriate part of the template
-				for (name in attributes.$attr) {
+				for (var name in attributes.$attr) {
 					if (attributes.$attr.hasOwnProperty(name)) {
-						attributeName = attributes.$attr[name];
 						switch (name) {
 						case 'id':
-							id = attributes.id + '-input';
+							var id = attributes.id + '-input';
 							eHelp.attr('id', id + '-help');
 							eError.attr('id', id + '-error');
 							eSelect.attr('id', id);
-							eLabel.attr('for', id);
-							break;
+							eLabel.attr('for', id); break;
 						case 'help':
-							// set the help text
-							eHelp.text(attributes[name]);
-							break;
+							eHelp.text(attributes.help); break;
 						case 'error':
-							// set the help text
-							eError.text(attributes[name]);
-							break;
+							eError.text(attributes.error); break;
 						case 'label':
-							// set the help text
-							eLabel.text(attributes[name]);
-							break;
+							eLabel.text(attributes.label); break;
 						case 'required':
 							eSelect.attr('required', 'true');
-							eSelect.attr('aria-required', 'true');
-							break;
+							eSelect.attr('aria-required', 'true'); break;
+						case 'classFieldset':
+							eFieldset.addClass(attributes.classFieldset); break;
+						case 'classError':
+							eError.addClass(attributes.classError); break;
+						case 'classSelectwrap':
+							eSelectwrap.addClass(attributes.classSelectwrap); break;
+						case 'classLabel':
+							eLabel.addClass(attributes.classLabel); break;
+						case 'class':
+							eSelect.addClass(attributes.class); break;
 						default:
 							// by default move the attribute to the input
-							eSelect.attr(attributeName, attributes[name]);
-							break;
+							eSelect.attr(attributes.$attr[name], attributes[name]);
 						}
 					}
 				}
 
 				// find the accessible form name
-				formName = aSelect.closest('form').attr('name');
-				inputName = formName + '.' + eSelect.attr('name');
+				var formName = aSelect.closest('form').attr('name');
+				var inputName = formName + '.' + eSelect.attr('name');
 				// set up the validation failures
 				eFieldset.attr('ng-class',
 					'{\'has-error\': ' + inputName + '.failsValidation()}');
@@ -377,15 +411,7 @@
 			require: '?ngModel',
 			link: function (scope, element, attrs, ctrl) {
 
-				$log.log('wohoo');
-				$log.log(ctrl);
-
 				if (!ctrl) {
-					return;
-				}
-
-				// this stops it applying to checkboxes
-				if (element.attr('type') === 'checkbox') {
 					return;
 				}
 
